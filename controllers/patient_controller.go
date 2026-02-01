@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-/* ================= CREATE ================= */
+/* ================= CREATE / DAFTAR ================= */
 
 func CreatePatient(c *gin.Context) {
 	var input dto.CreatePatientRequest
@@ -23,28 +23,44 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// VALIDASI POLI
+	/* ===== VALIDASI POLI ===== */
 	if err := config.DB.First(&models.Poli{}, input.PoliID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Poli tidak valid"})
 		return
 	}
 
-	// VALIDASI ASURANSI
+	/* ===== VALIDASI CARA BAYAR ===== */
 	if input.CaraBayar == "asuransi" {
 		if input.NomorJaminan == nil || len(*input.NomorJaminan) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan wajib diisi"})
+			return
+		}
+		if len(*input.NomorJaminan) > 20 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan maksimal 20 karakter"})
+			return
+		}
+
+		// cek nomor jaminan unik
+		var count int64
+		config.DB.Model(&models.Patient{}).
+			Where("nomor_jaminan = ?", *input.NomorJaminan).
+			Count(&count)
+
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor jaminan sudah digunakan"})
 			return
 		}
 	} else {
 		input.NomorJaminan = nil
 	}
 
-	// CEK PASIEN BERDASARKAN NIK
+	/* ===== CEK PASIEN BERDASARKAN NIK ===== */
 	var patient models.Patient
 	err := config.DB.Where("nik = ?", input.NIK).First(&patient).Error
 
-	/* ================= PASIEN SUDAH ADA ================= */
+	/* ===== PASIEN SUDAH ADA ===== */
 	if err == nil {
+
 		// ❌ Pasien baru tapi NIK sudah ada
 		if input.TipePasien == "baru" {
 			c.JSON(http.StatusConflict, gin.H{
@@ -53,7 +69,7 @@ func CreatePatient(c *gin.Context) {
 			return
 		}
 
-		// ✅ Pasien lama → UPDATE DATA YANG BOLEH
+		// ✅ Pasien lama → hanya update data tertentu
 		patient.CaraBayar = input.CaraBayar
 		patient.NomorJaminan = input.NomorJaminan
 		patient.PoliID = input.PoliID
@@ -68,13 +84,13 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	/* ================= ERROR DB ================= */
+	/* ===== ERROR DATABASE ===== */
 	if err != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	/* ================= PASIEN BELUM ADA ================= */
+	/* ===== PASIEN BELUM ADA ===== */
 	if input.TipePasien == "lama" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Pasien lama tidak ditemukan, silakan daftar sebagai pasien baru",
@@ -82,14 +98,14 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// PARSE TANGGAL LAHIR
+	/* ===== PARSE TANGGAL LAHIR ===== */
 	tgl, err := time.Parse("2006-01-02", input.TanggalLahir)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Format tanggal_lahir harus yyyy-mm-dd"})
 		return
 	}
 
-	// CREATE PASIEN BARU
+	/* ===== CREATE PASIEN BARU ===== */
 	newPatient := models.Patient{
 		NIK:          input.NIK,
 		NamaPasien:   input.NamaPasien,
@@ -158,26 +174,44 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
+	/* ===== VALIDASI POLI ===== */
 	if err := config.DB.First(&models.Poli{}, input.PoliID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Poli tidak valid"})
 		return
 	}
 
+	/* ===== VALIDASI JAMINAN ===== */
 	if input.CaraBayar == "asuransi" {
 		if input.NomorJaminan == nil || len(*input.NomorJaminan) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan wajib diisi"})
+			return
+		}
+		if len(*input.NomorJaminan) > 20 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan maksimal 20 karakter"})
+			return
+		}
+
+		var count int64
+		config.DB.Model(&models.Patient{}).
+			Where("nomor_jaminan = ? AND id != ?", *input.NomorJaminan, patient.ID).
+			Count(&count)
+
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Nomor jaminan sudah digunakan"})
 			return
 		}
 	} else {
 		input.NomorJaminan = nil
 	}
 
+	/* ===== UPDATE DATA ===== */
 	patient.CaraBayar = input.CaraBayar
 	patient.NomorJaminan = input.NomorJaminan
 	patient.PoliID = input.PoliID
 	patient.Status = input.Status
 
 	config.DB.Save(&patient)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Data pasien berhasil diperbarui"})
 }
 
