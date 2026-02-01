@@ -23,13 +23,13 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	/* ===== VALIDASI POLI ===== */
+	// VALIDASI POLI
 	if err := config.DB.First(&models.Poli{}, input.PoliID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Poli tidak valid"})
 		return
 	}
 
-	/* ===== VALIDASI CARA BAYAR ===== */
+	// VALIDASI JAMINAN
 	if input.CaraBayar == "asuransi" {
 		if input.NomorJaminan == nil || len(*input.NomorJaminan) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan wajib diisi"})
@@ -40,7 +40,6 @@ func CreatePatient(c *gin.Context) {
 			return
 		}
 
-		// cek nomor jaminan unik
 		var count int64
 		config.DB.Model(&models.Patient{}).
 			Where("nomor_jaminan = ?", *input.NomorJaminan).
@@ -54,14 +53,12 @@ func CreatePatient(c *gin.Context) {
 		input.NomorJaminan = nil
 	}
 
-	/* ===== CEK PASIEN BERDASARKAN NIK ===== */
+	// CEK NIK
 	var patient models.Patient
 	err := config.DB.Where("nik = ?", input.NIK).First(&patient).Error
 
-	/* ===== PASIEN SUDAH ADA ===== */
+	// PASIEN SUDAH ADA
 	if err == nil {
-
-		// ❌ Pasien baru tapi NIK sudah ada
 		if input.TipePasien == "baru" {
 			c.JSON(http.StatusConflict, gin.H{
 				"error": "Pasien dengan NIK ini sudah terdaftar",
@@ -69,7 +66,7 @@ func CreatePatient(c *gin.Context) {
 			return
 		}
 
-		// ✅ Pasien lama → hanya update data tertentu
+		// PASIEN LAMA
 		patient.CaraBayar = input.CaraBayar
 		patient.NomorJaminan = input.NomorJaminan
 		patient.PoliID = input.PoliID
@@ -84,13 +81,11 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	/* ===== ERROR DATABASE ===== */
 	if err != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	/* ===== PASIEN BELUM ADA ===== */
 	if input.TipePasien == "lama" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Pasien lama tidak ditemukan, silakan daftar sebagai pasien baru",
@@ -98,14 +93,13 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	/* ===== PARSE TANGGAL LAHIR ===== */
+	// PASIEN BARU
 	tgl, err := time.Parse("2006-01-02", input.TanggalLahir)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Format tanggal_lahir harus yyyy-mm-dd"})
 		return
 	}
 
-	/* ===== CREATE PASIEN BARU ===== */
 	newPatient := models.Patient{
 		NIK:          input.NIK,
 		NamaPasien:   input.NamaPasien,
@@ -151,7 +145,7 @@ func GetPatients(c *gin.Context) {
 	c.JSON(http.StatusOK, patients)
 }
 
-/* ================= UPDATE ================= */
+/* ================= UPDATE (TANPA STATUS) ================= */
 
 func UpdatePatient(c *gin.Context) {
 	id := c.Param("id")
@@ -166,7 +160,6 @@ func UpdatePatient(c *gin.Context) {
 		CaraBayar    string  `json:"cara_bayar" binding:"required,oneof=umum asuransi"`
 		NomorJaminan *string `json:"nomor_jaminan"`
 		PoliID       uint    `json:"poli_id" binding:"required"`
-		Status       string  `json:"status" binding:"required,oneof=proses selesai"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -174,13 +167,11 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	/* ===== VALIDASI POLI ===== */
 	if err := config.DB.First(&models.Poli{}, input.PoliID).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Poli tidak valid"})
 		return
 	}
 
-	/* ===== VALIDASI JAMINAN ===== */
 	if input.CaraBayar == "asuransi" {
 		if input.NomorJaminan == nil || len(*input.NomorJaminan) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Nomor jaminan wajib diisi"})
@@ -204,11 +195,9 @@ func UpdatePatient(c *gin.Context) {
 		input.NomorJaminan = nil
 	}
 
-	/* ===== UPDATE DATA ===== */
 	patient.CaraBayar = input.CaraBayar
 	patient.NomorJaminan = input.NomorJaminan
 	patient.PoliID = input.PoliID
-	patient.Status = input.Status
 
 	config.DB.Save(&patient)
 
@@ -219,7 +208,6 @@ func UpdatePatient(c *gin.Context) {
 
 func DeletePatient(c *gin.Context) {
 	id := c.Param("id")
-
 	config.DB.Delete(&models.Patient{}, id)
 	c.JSON(http.StatusOK, gin.H{"message": "Data pasien berhasil dihapus"})
 }
