@@ -50,7 +50,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 🔐 JWT
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"username": user.Username,

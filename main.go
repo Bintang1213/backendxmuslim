@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time" 
 	"tugas12/config"
 	"tugas12/models"
 	"tugas12/routes"
@@ -15,7 +16,7 @@ func main() {
 	godotenv.Load()
 	config.ConnectDB()
 
-	// 🔹 MIGRATION
+	//  MIGRATION
 	config.DB.AutoMigrate(
 		&models.User{},
 		&models.Poli{},
@@ -26,12 +27,23 @@ func main() {
 
 	r := gin.Default()
 
+	//  CORS Configuration
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:5173",
+			"https://cedrick-unlunated-gwyn.ngrok-free.app", 
 		},
-		AllowHeaders: []string{"Authorization", "Content-Type"},
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin", 
+			"Content-Type", 
+			"Authorization", 
+			"Accept", 
+			"ngrok-skip-browser-warning", 
+		},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour, 
 	}))
 
 	routes.RegisterRoutes(r)

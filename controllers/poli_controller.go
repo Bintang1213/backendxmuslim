@@ -10,6 +10,9 @@ import (
 
 func GetPolis(c *gin.Context) {
 	var polis []models.Poli
-	config.DB.Find(&polis)
+	if err := config.DB.Find(&polis).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data poli"})
+		return
+	}
 	c.JSON(http.StatusOK, polis)
 }

@@ -22,9 +22,9 @@ func ConnectDB() {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		panic("❌ Gagal koneksi database")
+		panic("Gagal koneksi database")
 	}
 
 	DB = db
-	fmt.Println("✅ Database terkoneksi")
+	fmt.Println("Database terkoneksi")
 }
